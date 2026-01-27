@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuthRole } from '../context/AuthRoleContext';
+import { getHealthStatus, getProfile } from '../lib/apiHelpers';
+import { AppConfig } from '../config';
 
 /**
  * PUBLIC_INTERFACE
@@ -7,6 +9,38 @@ import { useAuthRole } from '../context/AuthRoleContext';
 export default function Profile() {
   /** Profile page with demo auth controls and role-aware settings. */
   const { role, session, signInDemo, signOutDemo, isAdmin } = useAuthRole();
+
+  // Health/Profile demo states (optional)
+  const [health, setHealth] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [apiError, setApiError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    // Only attempt fetch if api base configured; otherwise skip silently.
+    const hasApi = typeof AppConfig.apiBaseUrl === 'string' && AppConfig.apiBaseUrl.length >= 0;
+
+    async function run() {
+      if (!hasApi) return;
+      try {
+        const [h, p] = await Promise.allSettled([getHealthStatus(), getProfile()]);
+        if (!mounted) return;
+
+        if (h.status === 'fulfilled') setHealth(h.value);
+        if (p.status === 'fulfilled') setProfileData(p.value);
+        if (h.status === 'rejected' || p.status === 'rejected') {
+          setApiError((h.status === 'rejected' ? h.reason?.message : null) || (p.status === 'rejected' ? p.reason?.message : null) || 'API error');
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setApiError(e?.message || 'API error');
+      }
+    }
+
+    run();
+    return () => { mounted = false; };
+  }, []);
 
   const DemoAuthControls = () => (
     <div className="card span-12">
@@ -75,6 +109,32 @@ export default function Profile() {
       </div>
 
       <DemoAuthControls />
+
+      {/* Optional: Show backend health and profile info if available */}
+      <div className="card span-12" role="region" aria-label="Backend health and profile">
+        <h3 style={{ marginTop: 0 }}>Service Status</h3>
+        <div style={{ color: '#6b7280' }}>
+          <div><strong>API Base:</strong> {AppConfig.apiBaseUrl || '(relative)'}</div>
+          <div><strong>Health Path:</strong> {AppConfig.healthcheckPath}</div>
+        </div>
+        {apiError && (
+          <p style={{ color: '#ef4444' }}>API Error: {apiError}</p>
+        )}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+          <div className="card span-6" style={{ margin: 0 }}>
+            <h4 style={{ marginTop: 0 }}>Health</h4>
+            <pre
+              style={{ marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8, overflow: 'auto' }}
+            >{health ? JSON.stringify(health, null, 2) : 'Loading...'}</pre>
+          </div>
+          <div className="card span-6" style={{ margin: 0 }}>
+            <h4 style={{ marginTop: 0 }}>Profile</h4>
+            <pre
+              style={{ marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8, overflow: 'auto' }}
+            >{profileData ? JSON.stringify(profileData, null, 2) : 'Loading...'}</pre>
+          </div>
+        </div>
+      </div>
 
       {isAdmin ? (
         <>
