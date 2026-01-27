@@ -1,11 +1,14 @@
 import React from 'react';
 import './topnav.css';
+import { useAuthRole } from '../context/AuthRoleContext';
 
 /**
  * PUBLIC_INTERFACE
  */
 export default function TopNavbar({ onToggleTheme, currentTheme = 'light' }) {
   /** Top navbar with quick actions and notifications. */
+  const { role, isAdmin, toggleRoleDemo } = useAuthRole();
+
   return (
     <header className="topnav" aria-label="Secondary">
       <div className="topnav__left">
@@ -18,6 +21,17 @@ export default function TopNavbar({ onToggleTheme, currentTheme = 'light' }) {
         <button className="btn btn-outline" aria-label="Quick Action">
           ⚡
         </button>
+        <button
+          className="btn btn-outline"
+          onClick={toggleRoleDemo}
+          aria-label="Toggle role"
+          title="Switch between user/admin (demo)"
+        >
+          {isAdmin ? 'Switch to User' : 'Switch to Admin'}
+        </button>
+        <span className="btn" aria-label="Current role" title="Current role">
+          Role: {role}
+        </span>
         <button
           className="btn btn-primary"
           onClick={onToggleTheme}
