@@ -26,7 +26,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="App" style={{ background: 'var(--background)' }}>
+      <div className="App">
         <Layout onToggleTheme={toggleTheme} currentTheme={theme}>
           <Routes>
             <Route path="/" element={<Dashboard />} />

@@ -1,22 +1,60 @@
-/* Global theme variables (kept for compatibility with dark/light toggle) */
+/* Global theme variables (Light theme) */
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --text-primary: #111827;
-  --text-secondary: #3B82F6;
+  /* Core palette */
+  --primary: #3B82F6;
+  --primary-600: #2563eb;
+  --primary-100: rgba(59, 130, 246, 0.10);
+
+  --secondary: #10B981;
+  --secondary-600: #059669;
+  --secondary-100: rgba(16, 185, 129, 0.10);
+
+  --success: #10B981;
+  --warning: #F59E0B;
+  --warning-600: #d97706;
+  --warning-100: rgba(245, 158, 11, 0.10);
+
+  --error: #EF4444;
+  --error-600: #dc2626;
+  --error-100: rgba(239, 68, 68, 0.10);
+
+  /* Surfaces and text */
+  --background: #f9fafb;
+  --surface: #ffffff;
+  --text: #111827;
+  --text-muted: #6b7280;
+
+  /* Borders and shadows */
   --border-color: #e5e7eb;
-  --button-bg: #3B82F6;
+  --focus-ring: rgba(59, 130, 246, 0.35);
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-2: 0 10px 30px rgba(0,0,0,0.08);
+
+  /* Buttons */
+  --button-bg: var(--primary);
   --button-text: #ffffff;
 }
 
+/* Dark mode token mapping (kept for compatibility with toggle) */
 [data-theme="dark"] {
-  --bg-primary: #0b1220;
-  --bg-secondary: #0f172a;
-  --text-primary: #e5e7eb;
-  --text-secondary: #61dafb;
+  --background: #0f172a;
+  --surface: #0b1220;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
   --border-color: #24324a;
-  --button-bg: #2563eb;
-  --button-text: #ffffff;
+
+  --primary: #3B82F6;
+  --primary-600: #2563eb;
+  --primary-100: rgba(59, 130, 246, 0.18);
+
+  --secondary: #10B981;
+  --secondary-600: #059669;
+  --secondary-100: rgba(16, 185, 129, 0.18);
+
+  --warning-100: rgba(245, 158, 11, 0.18);
+  --error-100: rgba(239, 68, 68, 0.18);
+
+  --focus-ring: rgba(59, 130, 246, 0.45);
 }
 
 .App {
@@ -24,9 +62,13 @@
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Utility visibility for links */
+/* Links */
 .App-link {
-  color: var(--text-secondary);
+  color: var(--primary);
+  text-decoration: none;
+}
+.App-link:hover {
+  text-decoration: underline;
 }
 
 /* Minimal reset for buttons in pages */
