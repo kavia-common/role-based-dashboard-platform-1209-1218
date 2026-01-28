@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './topnav.css';
 import { useAuthRole } from '../context/AuthRoleContext';
+import { AppConfig } from '../config';
+import { getNotifications } from '../lib/apiHelpers';
 
 /**
  * PUBLIC_INTERFACE
@@ -17,6 +19,16 @@ export default function TopNavbar({ onToggleTheme, currentTheme = 'light' }) {
   const notifMenuRef = useRef(null);
   const userBtnRef = useRef(null);
   const userMenuRef = useRef(null);
+
+  // Notifications state (loading/error/data)
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifError, setNotifError] = useState(null);
+  const [notifItems, setNotifItems] = useState([]);
+
+  // Determine if we should use live API for notifications
+  const features = AppConfig.featureFlags || {};
+  const apiDisabled = features.disableApi === true || features.disableNotificationsFetch === true;
+  const canUseApi = !apiDisabled && typeof AppConfig.apiBaseUrl === 'string';
 
   // Close menus on outside click or Escape
   useEffect(() => {
@@ -62,12 +74,55 @@ export default function TopNavbar({ onToggleTheme, currentTheme = 'light' }) {
     }
   };
 
-  // Placeholder notifications
-  const notifications = [
+  // Placeholder notifications used as fallback
+  const placeholderNotifications = [
     { id: 'n1', icon: '✅', title: 'Build succeeded', desc: 'Your latest build completed.' },
     { id: 'n2', icon: '📩', title: '2 new messages', desc: 'Check your inbox.' },
     { id: 'n3', icon: '⚠️', title: 'Quota nearing', desc: 'Usage is at 85% of limit.' },
   ];
+
+  // Load notifications when menu opens (lazy load)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!notifOpen) return;
+      // If API is disabled or unavailable, use placeholders
+      if (!canUseApi) {
+        setNotifError(null);
+        setNotifItems(placeholderNotifications);
+        return;
+      }
+      setNotifLoading(true);
+      setNotifError(null);
+      try {
+        const items = await getNotifications();
+        if (!active) return;
+        if (Array.isArray(items) && items.length > 0) {
+          // Normalize to expected shape: {id, icon?, title, desc}
+          const normalized = items.map((it, idx) => ({
+            id: String(it.id ?? idx),
+            icon: it.icon ?? '🔔',
+            title: it.title ?? 'Notification',
+            desc: it.description ?? it.desc ?? '',
+          }));
+          setNotifItems(normalized);
+        } else {
+          setNotifItems([]); // empty state
+        }
+      } catch (e) {
+        if (!active) return;
+        // On error, fall back to placeholders but also show error banner
+        setNotifError(e?.message || 'Failed to load notifications');
+        setNotifItems(placeholderNotifications);
+      } finally {
+        if (active) setNotifLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifOpen]);
 
   return (
     <header className="topnav" aria-label="Secondary">
@@ -99,18 +154,30 @@ export default function TopNavbar({ onToggleTheme, currentTheme = 'light' }) {
               ref={notifMenuRef}
             >
               <div className="dropdown__header">Notifications</div>
+              {notifLoading && (
+                <div style={{ padding: 8, color: 'var(--text-muted)' }}>Loading...</div>
+              )}
+              {notifError && (
+                <div style={{ padding: 8, color: '#ef4444' }}>Error: {notifError}</div>
+              )}
               <ul className="dropdown__list" role="none">
-                {notifications.map((n) => (
-                  <li key={n.id} role="none">
-                    <button className="dropdown__item" role="menuitem" tabIndex={0}>
-                      <span aria-hidden style={{ marginRight: 8 }}>{n.icon}</span>
-                      <div className="dropdown__item-text">
-                        <div className="dropdown__item-title">{n.title}</div>
-                        <div className="dropdown__item-desc">{n.desc}</div>
-                      </div>
-                    </button>
+                {notifItems.length === 0 ? (
+                  <li role="none" style={{ padding: 8, color: 'var(--text-muted)' }}>
+                    No notifications.
                   </li>
-                ))}
+                ) : (
+                  notifItems.map((n) => (
+                    <li key={n.id} role="none">
+                      <button className="dropdown__item" role="menuitem" tabIndex={0}>
+                        <span aria-hidden style={{ marginRight: 8 }}>{n.icon || '🔔'}</span>
+                        <div className="dropdown__item-text">
+                          <div className="dropdown__item-title">{n.title}</div>
+                          <div className="dropdown__item-desc">{n.desc}</div>
+                        </div>
+                      </button>
+                    </li>
+                  ))
+                )}
               </ul>
               <div className="dropdown__footer">
                 <button className="btn btn-outline btn-small" onClick={() => setNotifOpen(false)}>

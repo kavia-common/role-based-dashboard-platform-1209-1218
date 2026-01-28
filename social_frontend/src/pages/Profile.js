@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthRole } from '../context/AuthRoleContext';
-import { getHealthStatus, getProfile } from '../lib/apiHelpers';
+import { getHealthStatus, getCurrentUser } from '../lib/apiHelpers';
 import { AppConfig } from '../config';
 
 /**
@@ -10,36 +10,67 @@ export default function Profile() {
   /** Profile page with demo auth controls and role-aware settings. */
   const { role, session, signInDemo, signOutDemo, isAdmin } = useAuthRole();
 
-  // Health/Profile demo states (optional)
+  // Health/Profile states with loading and error flags
   const [health, setHealth] = useState(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState(null);
+
   const [profileData, setProfileData] = useState(null);
-  const [apiError, setApiError] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+
+  // Determine whether we should attempt live API calls based on env/flags
+  const features = AppConfig.featureFlags || {};
+  const apiGloballyDisabled = features.disableApi === true;
+  const canUseApi = !apiGloballyDisabled && typeof AppConfig.apiBaseUrl === 'string';
 
   useEffect(() => {
     let mounted = true;
 
-    // Only attempt fetch if api base configured; otherwise skip silently.
-    const hasApi = typeof AppConfig.apiBaseUrl === 'string' && AppConfig.apiBaseUrl.length >= 0;
-
-    async function run() {
-      if (!hasApi) return;
+    // Health fetch: allowed if apiBaseUrl exists (relative OK), try/catch guarded
+    (async () => {
+      if (!canUseApi) {
+        // No API configured or disabled: skip gracefully
+        return;
+      }
+      setHealthLoading(true);
+      setHealthError(null);
       try {
-        const [h, p] = await Promise.allSettled([getHealthStatus(), getProfile()]);
+        const h = await getHealthStatus();
         if (!mounted) return;
-
-        if (h.status === 'fulfilled') setHealth(h.value);
-        if (p.status === 'fulfilled') setProfileData(p.value);
-        if (h.status === 'rejected' || p.status === 'rejected') {
-          setApiError((h.status === 'rejected' ? h.reason?.message : null) || (p.status === 'rejected' ? p.reason?.message : null) || 'API error');
-        }
+        setHealth(h);
       } catch (e) {
         if (!mounted) return;
-        setApiError(e?.message || 'API error');
+        setHealthError(e?.message || 'Failed to load health status');
+      } finally {
+        if (mounted) setHealthLoading(false);
       }
-    }
+    })();
 
-    run();
-    return () => { mounted = false; };
+    // Profile fetch: obeys feature flags (will throw if disabled)
+    (async () => {
+      if (!canUseApi) {
+        // No API configured or disabled: skip gracefully
+        return;
+      }
+      setProfileLoading(true);
+      setProfileError(null);
+      try {
+        const p = await getCurrentUser();
+        if (!mounted) return;
+        setProfileData(p);
+      } catch (e) {
+        if (!mounted) return;
+        setProfileError(e?.message || 'Failed to load profile');
+      } finally {
+        if (mounted) setProfileLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const DemoAuthControls = () => (
@@ -99,6 +130,35 @@ export default function Profile() {
     </div>
   );
 
+  // Render helpers for loading/empty/error states
+  const renderHealthBlock = () => {
+    if (!canUseApi) {
+      return <div style={{ color: '#6b7280' }}>Live API disabled or not configured; showing placeholders.</div>;
+    }
+    if (healthLoading) return <div>Loading health...</div>;
+    if (healthError) return <div style={{ color: '#ef4444' }}>Error: {healthError}</div>;
+    if (!health) return <div style={{ color: '#6b7280' }}>No health data.</div>;
+    return (
+      <pre
+        style={{ marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8, overflow: 'auto' }}
+      >{JSON.stringify(health, null, 2)}</pre>
+    );
+  };
+
+  const renderProfileBlock = () => {
+    if (!canUseApi) {
+      return <div style={{ color: '#6b7280' }}>Live API disabled or not configured; using session demo data.</div>;
+    }
+    if (profileLoading) return <div>Loading profile...</div>;
+    if (profileError) return <div style={{ color: '#ef4444' }}>Error: {profileError}</div>;
+    if (!profileData) return <div style={{ color: '#6b7280' }}>No profile data.</div>;
+    return (
+      <pre
+        style={{ marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8, overflow: 'auto' }}
+      >{JSON.stringify(profileData, null, 2)}</pre>
+    );
+  };
+
   return (
     <div className="card-grid">
       <div className="card span-12">
@@ -117,21 +177,14 @@ export default function Profile() {
           <div><strong>API Base:</strong> {AppConfig.apiBaseUrl || '(relative)'}</div>
           <div><strong>Health Path:</strong> {AppConfig.healthcheckPath}</div>
         </div>
-        {apiError && (
-          <p style={{ color: '#ef4444' }}>API Error: {apiError}</p>
-        )}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
           <div className="card span-6" style={{ margin: 0 }}>
             <h4 style={{ marginTop: 0 }}>Health</h4>
-            <pre
-              style={{ marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8, overflow: 'auto' }}
-            >{health ? JSON.stringify(health, null, 2) : 'Loading...'}</pre>
+            {renderHealthBlock()}
           </div>
           <div className="card span-6" style={{ margin: 0 }}>
             <h4 style={{ marginTop: 0 }}>Profile</h4>
-            <pre
-              style={{ marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 8, padding: 8, overflow: 'auto' }}
-            >{profileData ? JSON.stringify(profileData, null, 2) : 'Loading...'}</pre>
+            {renderProfileBlock()}
           </div>
         </div>
       </div>
